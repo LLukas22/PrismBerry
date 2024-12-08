@@ -1,15 +1,17 @@
 from typing import Annotated
 from fastapi import Depends, FastAPI
+from fastapi_utils.tasks import repeat_every
 from fasthtml.common import *
 from typing import Optional
 from sqlmodel import SQLModel, Session, create_engine, select
 import uuid
 from pathlib import Path
 from PIL import Image
+import random
 
-from models import ImageEntry, BackgroundColor
+from models import ImageEntry, BackgroundColor, Settings
 from image_processor import ImageProcessor
-
+# from display import EPD
 
 IMAGE_EXTENSION = "png"
 ROOT = Path(__file__).parent.parent
@@ -22,6 +24,10 @@ PROCESSED_DIR.mkdir(exist_ok=True)
 DB_DIR = ROOT / "db"
 DB_DIR.mkdir(exist_ok=True)
 DB_FILE = DB_DIR / "database.db"
+
+GLOGAL_COUNTER: int = 0
+
+# DISPLAY = EPD()
 
 engine = create_engine(f"sqlite:///{DB_FILE}")
 
@@ -55,7 +61,16 @@ def root():
                     )
                 ),
                 Ul(
-                    Li(A(I(cls="fa fa-cog"), "Settings", cls="contrast")),
+                    Li(
+                        A(
+                            I(cls="fa fa-cog"),
+                            "Settings",
+                            cls="contrast",
+                            hx_get="/settings",
+                            hx_trigger="click",
+                            target_id="content",
+                        )
+                    ),
                     Li(
                         Button(
                             I(cls="fa fa-plus"),
@@ -76,6 +91,55 @@ def root():
         ),
         Footer(Small("Build with love <3"), cls="container"),
     )
+
+
+def render_settings(settings: Settings):
+    return Div(
+        H1(I(cls="fa fa-cog"), "Settings"),
+        Form(
+            Label(
+                "Cycle",
+                Input(
+                    type="checkbox", role="switch", checked=settings.cycle, name="cycle"
+                ),
+                data_tooltip="Enables cycling though your images",
+            ),
+            Label(
+                "Cycle Time",
+                Input(value=settings.cycle_time, type="number", name="cycle_time"),
+                data_tooltip="Cycle time in Minutes",
+            ),
+            Input(type="submit", value="Save"),
+            hx_post="/settings",
+            hx_trigger="submit",
+            target_id="content",
+        ),
+    )
+
+
+@app.get("/settings")
+def settings():
+    with Session(engine) as session:
+        settings = session.exec(select(Settings)).first()
+        if settings:
+            return render_settings(settings)
+
+
+@app.post("/settings")
+def update_settings(cycle: Optional[bool] = None, cycle_time: Optional[int] = None):
+    with Session(engine) as session:
+        settings = session.exec(select(Settings)).first()
+        if settings:
+            if cycle is not None:
+                settings.cycle = True
+            else:
+                settings.cycle = False
+
+            if cycle_time and int(cycle_time) > 0:
+                settings.cycle_time = cycle_time
+            session.add(settings)
+            session.commit()
+            return render_settings(settings)
 
 
 def render_image_options(entry: ImageEntry):
@@ -349,9 +413,46 @@ def get_preview(id: str):
         )
 
 
+@app.post("/display/{id}")
+def display_image(id: str):
+    with Session(engine) as session:
+        entry: ImageEntry = session.get(ImageEntry, id)
+        image = Image.open(ORIGINAL_DIR / f"{entry.id}.{IMAGE_EXTENSION}")
+        processed_image = IMAGE_PROCESSOR(
+            image, entry.grayscale, entry.dither, entry.background_color
+        )
+        print(f"Displaying image: {entry.name}")
+        # TODO display the image on the eink display
+
+
+@app.on_event("startup")
+@repeat_every(seconds=60, wait_first=True)
+def cycle_background_task() -> None:
+    with Session(engine) as session:
+        settings = session.exec(select(Settings)).first()
+        if settings.cycle:
+            global GLOGAL_COUNTER
+            GLOGAL_COUNTER -= 1
+            if GLOGAL_COUNTER <= 0:
+                GLOGAL_COUNTER = settings.cycle_time
+                entries = session.exec(select(ImageEntry)).all()
+                if len(entries) > 0:
+                    entry = random.choice(entries)
+                    display_image(entry.id)
+
+
 if __name__ == "__main__":
     import uvicorn
 
     SQLModel.metadata.create_all(engine)
 
-    uvicorn.run(app, host="localhost", port=8000)
+    # ensure that the settings table is populated
+    with Session(engine) as session:
+        if not session.exec(select(Settings)).first():
+            session.add(Settings())
+            session.commit()
+
+        settigns = session.exec(select(Settings)).first()
+        GLOGAL_COUNTER = settigns.cycle_time
+
+    uvicorn.run(app, host="0.0.0.0", port=8000)

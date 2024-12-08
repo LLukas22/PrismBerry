@@ -30,7 +30,7 @@
 #
 
 import logging
-from . import epdconfig
+from .edpconfig import epdconfig
 
 import PIL
 from PIL import Image
