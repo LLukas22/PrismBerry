@@ -1,5 +1,6 @@
 from PIL import Image, ImageOps
 from PIL.Image import Palette, Quantize, Dither
+from models import BackgroundColor
 
 PALETTE = (
     0,
@@ -36,7 +37,11 @@ class ImageProcessor:
         self.gray_image.putpalette((0, 0, 0, 255, 255, 255) + (0, 0, 0) * 254)
 
     def __call__(
-        self, image: Image, grayscale: bool = False, dither: bool = True
+        self,
+        image: Image,
+        grayscale: bool = False,
+        dither: bool = True,
+        background_color: BackgroundColor = BackgroundColor.Black,
     ) -> Image:
         image = ImageOps.contain(image, self.target_size)
 
@@ -57,6 +62,6 @@ class ImageProcessor:
         quanitzed = ImageOps.expand(
             quanitzed,
             (left_padding, top_padding, right_padding, bottom_padding),
-            fill="black",
+            fill=background_color.value,
         )
         return quanitzed
