@@ -31,7 +31,7 @@
 
 import logging
 from .base import Display
-from .edpconfig import epdconfig
+from .edpconfig import RaspberryPi
 
 import PIL
 from PIL import Image
@@ -51,10 +51,11 @@ class EPD7IN3F(Display):
 
     def __init__(self):
         super().__init__(EPD_WIDTH, EPD_HEIGHT)
-        self.reset_pin = epdconfig.RST_PIN
-        self.dc_pin = epdconfig.DC_PIN
-        self.busy_pin = epdconfig.BUSY_PIN
-        self.cs_pin = epdconfig.CS_PIN
+        self.driver = RaspberryPi()
+        self.reset_pin = self.driver.RST_PIN
+        self.dc_pin = self.driver.DC_PIN
+        self.busy_pin = self.driver.BUSY_PIN
+        self.cs_pin = self.driver.CS_PIN
         self.BLACK = 0x000000  #   0000  BGR
         self.WHITE = 0xFFFFFF  #   0001
         self.GREEN = 0x00FF00  #   0010
@@ -65,36 +66,36 @@ class EPD7IN3F(Display):
 
     # Hardware reset
     def reset(self):
-        epdconfig.digital_write(self.reset_pin, 1)
-        epdconfig.delay_ms(20)
-        epdconfig.digital_write(self.reset_pin, 0)  # module reset
-        epdconfig.delay_ms(2)
-        epdconfig.digital_write(self.reset_pin, 1)
-        epdconfig.delay_ms(20)
+        self.driver.digital_write(self.reset_pin, 1)
+        self.driver.delay_ms(20)
+        self.driver.digital_write(self.reset_pin, 0)  # module reset
+        self.driver.delay_ms(2)
+        self.driver.digital_write(self.reset_pin, 1)
+        self.driver.delay_ms(20)
 
     def send_command(self, command):
-        epdconfig.digital_write(self.dc_pin, 0)
-        epdconfig.digital_write(self.cs_pin, 0)
-        epdconfig.spi_writebyte([command])
-        epdconfig.digital_write(self.cs_pin, 1)
+        self.driver.digital_write(self.dc_pin, 0)
+        self.driver.digital_write(self.cs_pin, 0)
+        self.driver.spi_writebyte([command])
+        self.driver.digital_write(self.cs_pin, 1)
 
     def send_data(self, data):
-        epdconfig.digital_write(self.dc_pin, 1)
-        epdconfig.digital_write(self.cs_pin, 0)
-        epdconfig.spi_writebyte([data])
-        epdconfig.digital_write(self.cs_pin, 1)
+        self.driver.digital_write(self.dc_pin, 1)
+        self.driver.digital_write(self.cs_pin, 0)
+        self.driver.spi_writebyte([data])
+        self.driver.digital_write(self.cs_pin, 1)
 
     # send a lot of data
     def send_data2(self, data):
-        epdconfig.digital_write(self.dc_pin, 1)
-        epdconfig.digital_write(self.cs_pin, 0)
-        epdconfig.spi_writebyte2(data)
-        epdconfig.digital_write(self.cs_pin, 1)
+        self.driver.digital_write(self.dc_pin, 1)
+        self.driver.digital_write(self.cs_pin, 0)
+        self.driver.spi_writebyte2(data)
+        self.driver.digital_write(self.cs_pin, 1)
 
     def ReadBusyH(self):
         logger.debug("e-Paper busy H")
-        while epdconfig.digital_read(self.busy_pin) == 0:  # 0: busy, 1: idle
-            epdconfig.delay_ms(5)
+        while self.driver.digital_read(self.busy_pin) == 0:  # 0: busy, 1: idle
+            self.driver.delay_ms(5)
         logger.debug("e-Paper busy H release")
 
     def TurnOnDisplay(self):
@@ -110,12 +111,12 @@ class EPD7IN3F(Display):
         self.ReadBusyH()
 
     def init(self):
-        if epdconfig.module_init() != 0:
+        if self.driver.module_init() != 0:
             return -1
         # EPD hardware init start
         self.reset()
         self.ReadBusyH()
-        epdconfig.delay_ms(30)
+        self.driver.delay_ms(30)
 
         self.send_command(0xAA)  # CMDH
         self.send_data(0x49)
@@ -232,8 +233,8 @@ class EPD7IN3F(Display):
         self.send_command(0x07)  # DEEP_SLEEP
         self.send_data(0xA5)
 
-        epdconfig.delay_ms(2000)
-        epdconfig.module_exit()
+        self.driver.delay_ms(2000)
+        self.driver.module_exit()
 
 
 ### END OF FILE ###
