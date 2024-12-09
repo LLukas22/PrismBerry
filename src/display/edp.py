@@ -30,6 +30,7 @@
 #
 
 import logging
+from .base import Display
 from .edpconfig import epdconfig
 
 import PIL
@@ -40,17 +41,20 @@ import io
 EPD_WIDTH = 800
 EPD_HEIGHT = 480
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger("uvicorn.error")
 
 
-class EPD:
+class EPD7IN3F(Display):
+    """e-Paper 7.3" (800x480) display driver
+    Wiki: https://www.waveshare.com/wiki/7.3inch_e-Paper_HAT_(F)
+    """
+
     def __init__(self):
+        super().__init__(EPD_WIDTH, EPD_HEIGHT)
         self.reset_pin = epdconfig.RST_PIN
         self.dc_pin = epdconfig.DC_PIN
         self.busy_pin = epdconfig.BUSY_PIN
         self.cs_pin = epdconfig.CS_PIN
-        self.width = EPD_WIDTH
-        self.height = EPD_HEIGHT
         self.BLACK = 0x000000  #   0000  BGR
         self.WHITE = 0xFFFFFF  #   0001
         self.GREEN = 0x00FF00  #   0010
@@ -199,51 +203,8 @@ class EPD:
         self.send_data(0x00)
         return 0
 
-    def getbuffer(self, image):
-        # Create a pallette with the 7 colors supported by the panel
-        pal_image = Image.new("P", (1, 1))
-        pal_image.putpalette(
-            (
-                0,
-                0,
-                0,
-                255,
-                255,
-                255,
-                0,
-                255,
-                0,
-                0,
-                0,
-                255,
-                255,
-                0,
-                0,
-                255,
-                255,
-                0,
-                255,
-                128,
-                0,
-            )
-            + (0, 0, 0) * 249
-        )
-
-        # Check if we need to rotate the image
-        imwidth, imheight = image.size
-        if imwidth == self.width and imheight == self.height:
-            image_temp = image
-        elif imwidth == self.height and imheight == self.width:
-            image_temp = image.rotate(90, expand=True)
-        else:
-            logger.warning(
-                "Invalid image dimensions: %d x %d, expected %d x %d"
-                % (imwidth, imheight, self.width, self.height)
-            )
-
-        # Convert the soruce image to the 7 colors, dithering if needed
-        image_7color = image_temp.convert("RGB").quantize(palette=pal_image)
-        buf_7color = bytearray(image_7color.tobytes("raw"))
+    def get_buffer(self, image: Image) -> list[int]:
+        buf_7color = bytearray(image.tobytes("raw"))
 
         # PIL does not support 4 bit color, so pack the 4 bits of color
         # into a single byte to transfer to the panel
@@ -255,13 +216,13 @@ class EPD:
 
         return buf
 
-    def display(self, image):
+    def display(self, image_data: list[int]):
         self.send_command(0x10)
         self.send_data2(image)
 
         self.TurnOnDisplay()
 
-    def Clear(self, color=0x11):
+    def clear(self, color=0x11):
         self.send_command(0x10)
         self.send_data2([color] * int(self.height) * int(self.width / 2))
 

@@ -8,10 +8,16 @@ import uuid
 from pathlib import Path
 from PIL import Image
 import random
-
+import logging
 from models import ImageEntry, BackgroundColor, Settings
 from image_processor import ImageProcessor
-# from display import EPD
+from display import Display
+
+try:
+    from display.edp import EPD7IN3F as DisplayToUse
+except Exception as e:
+    print(f"Error loading display: {e}")
+    from display import DummyDisplay as DisplayToUse
 
 IMAGE_EXTENSION = "png"
 ROOT = Path(__file__).parent.parent
@@ -27,7 +33,7 @@ DB_FILE = DB_DIR / "database.db"
 
 GLOGAL_COUNTER: int = 0
 
-# DISPLAY = EPD()
+DISPLAY: Display = DisplayToUse()
 
 engine = create_engine(f"sqlite:///{DB_FILE}")
 
@@ -421,8 +427,9 @@ def display_image(id: str):
         processed_image = IMAGE_PROCESSOR(
             image, entry.grayscale, entry.dither, entry.background_color
         )
-        print(f"Displaying image: {entry.name}")
-        # TODO display the image on the eink display
+        logging.info(f"Displaying image: {entry.name}")
+        global DISPLAY
+        DISPLAY.display(DISPLAY.get_buffer(processed_image))
 
 
 @app.on_event("startup")
@@ -455,4 +462,5 @@ if __name__ == "__main__":
         settigns = session.exec(select(Settings)).first()
         GLOGAL_COUNTER = settigns.cycle_time
 
+    DISPLAY.init()
     uvicorn.run(app, host="0.0.0.0", port=8000)

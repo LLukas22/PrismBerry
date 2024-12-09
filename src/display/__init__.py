@@ -1,1 +1,1 @@
-from .edp import EPD
+from .base import Display, DummyDisplay
