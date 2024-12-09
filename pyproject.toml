@@ -13,3 +13,10 @@ dependencies = [
     "sqlmodel>=0.0.22",
     "typing-inspect>=0.9.0",
 ]
+
+[project.optional-dependencies]
+pi = [
+    "RPi.GPIO>=0.7.0",
+    "gpiozero>=2.0.1",
+    "spidev>=3.6",
+]
