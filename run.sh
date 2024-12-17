@@ -5,6 +5,16 @@ VENV_DIR=".venv"
 PYTHON_SCRIPT="./src/main.py"
 REQUIREMENTS_FILE="requirements.txt"
 
+# Function to handle script interruption
+handle_interrupt() {
+    echo "Script interrupted. Cleaning up..."
+    deactivate 2>/dev/null
+    exit 1
+}
+
+# Trap SIGINT (Ctrl + C) signal
+trap handle_interrupt SIGINT
+
 if [ ! -d "$VENV_DIR" ]; then
     # Create the virtual environment
     echo "Creating virtual environment..."
