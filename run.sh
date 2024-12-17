@@ -13,16 +13,16 @@ else
     echo "Virtual environment already exists."
 fi
 
+# Activate the virtual environment
+echo "Activating virtual environment..."
+source $VENV_DIR/bin/activate
+
 if [ -f "$REQUIREMENTS_FILE" ]; then
     echo "Installing required packages..."
     pip install -r $REQUIREMENTS_FILE
 else
     echo "Requirements file not found!"
 fi
-
-# Activate the virtual environment
-echo "Activating virtual environment..."
-source $VENV_DIR/bin/activate
 
 # Run the Python script
 echo "Running Python script..."
