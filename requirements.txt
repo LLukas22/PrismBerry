@@ -1,0 +1,10 @@
+fastapi-utils>=0.8.0
+fastapi>=0.115.5
+fastsql>=2.0.3
+pillow>=10.4.0
+python-fasthtml>=0.10.1
+sqlmodel>=0.0.22
+typing-inspect>=0.9.0
+rpi-lgpio>=0.6
+gpiozero>=2.0.1
+spidev>=3.6

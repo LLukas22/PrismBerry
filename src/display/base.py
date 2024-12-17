@@ -36,6 +36,13 @@ class Display(ABC):
         """
         pass
 
+    @abstractmethod
+    def sleep(self):
+        """
+        Put the display to sleep
+        """
+        pass
+
 
 class DummyDisplay(Display):
     def __init__(self):
@@ -54,3 +61,6 @@ class DummyDisplay(Display):
     def get_buffer(self, image: Image) -> list[int]:
         self.logger.info("Dummy display getting buffer")
         return [0] * self.width * self.height
+
+    def sleep(self):
+        self.logger.info("Dummy display going to sleep")

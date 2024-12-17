@@ -219,8 +219,7 @@ class EPD7IN3F(Display):
 
     def display(self, image_data: list[int]):
         self.send_command(0x10)
-        self.send_data2(image)
-
+        self.send_data2(image_data)
         self.TurnOnDisplay()
 
     def clear(self, color=0x11):

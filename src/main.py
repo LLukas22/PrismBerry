@@ -429,7 +429,10 @@ def display_image(id: str):
         )
         logging.info(f"Displaying image: {entry.name}")
         global DISPLAY
+        DISPLAY.init()
         DISPLAY.display(DISPLAY.get_buffer(processed_image))
+        DISPLAY.sleep()
+        logging.info("Display was put back to sleep.")
 
 
 @app.on_event("startup")
@@ -462,5 +465,4 @@ if __name__ == "__main__":
         settigns = session.exec(select(Settings)).first()
         GLOGAL_COUNTER = settigns.cycle_time
 
-    DISPLAY.init()
     uvicorn.run(app, host="0.0.0.0", port=8000)
