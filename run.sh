@@ -15,6 +15,20 @@ handle_interrupt() {
 # Trap SIGINT (Ctrl + C) signal
 trap handle_interrupt SIGINT
 
+# Check for Git updates
+echo "Checking for Git updates..."
+git fetch
+if [ $(git rev-parse HEAD) != $(git rev-parse @{u}) ]; then
+    echo "There are updates available. Pulling the latest changes..."
+    git reset --hard origin/$(git rev-parse --abbrev-ref HEAD)
+    echo "Setting executable permission for the script..."
+    chmod +x "$0"
+    echo "Rerunning the script..."
+    exec "$0" "$@"
+else
+    echo "Your branch is up to date."
+fi
+
 if [ ! -d "$VENV_DIR" ]; then
     # Create the virtual environment
     echo "Creating virtual environment..."
