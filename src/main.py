@@ -15,9 +15,11 @@ from display import Display
 
 try:
     from display.edp import EPD7IN3F as DisplayToUse
+    DISPLAY: Display = DisplayToUse()
 except Exception as e:
     print(f"Error loading display: {e}")
     from display import DummyDisplay as DisplayToUse
+    DISPLAY: Display = DisplayToUse()
 
 IMAGE_EXTENSION = "png"
 ROOT = Path(__file__).parent.parent
@@ -33,7 +35,7 @@ DB_FILE = DB_DIR / "database.db"
 
 GLOGAL_COUNTER: int = 0
 
-DISPLAY: Display = DisplayToUse()
+
 
 engine = create_engine(f"sqlite:///{DB_FILE}")
 
