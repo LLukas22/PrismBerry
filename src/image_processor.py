@@ -1,6 +1,6 @@
 from PIL import Image, ImageOps
-from PIL.Image import Palette, Quantize, Dither
-from models import BackgroundColor
+from PIL.Image import Quantize, Dither
+from models import BackgroundColor, ImageEntry, Rotation
 
 PALETTE = (
     0,
@@ -36,20 +36,17 @@ class ImageProcessor:
         self.gray_image = Image.new("P", (1, 1))
         self.gray_image.putpalette((0, 0, 0, 255, 255, 255) + (0, 0, 0) * 254)
 
-    def __call__(
-        self,
-        image: Image,
-        grayscale: bool = False,
-        dither: bool = True,
-        background_color: BackgroundColor = BackgroundColor.Black,
-    ) -> Image:
+    def __call__(self, image: Image, entry: ImageEntry) -> Image:
+        if entry.rotation != Rotation._None:
+            image = image.rotate(entry.rotation.value, expand=True)
+
         image = ImageOps.contain(image, self.target_size)
 
-        palette = self.gray_image if grayscale else self.color_image
+        palette = self.gray_image if entry.grayscale else self.color_image
         quanitzed = image.convert("RGB").quantize(
             palette=palette,
             method=Quantize.FASTOCTREE,
-            dither=Dither.FLOYDSTEINBERG if dither else Dither.NONE,
+            dither=Dither.FLOYDSTEINBERG if entry.dither else Dither.NONE,
             kmeans=32,
         )
 
@@ -62,6 +59,6 @@ class ImageProcessor:
         quanitzed = ImageOps.expand(
             quanitzed,
             (left_padding, top_padding, right_padding, bottom_padding),
-            fill=background_color.value,
+            fill=entry.background_color.value,
         )
         return quanitzed

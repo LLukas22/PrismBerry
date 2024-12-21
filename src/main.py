@@ -2,6 +2,7 @@ from typing import Any
 from fastapi_utils.tasks import repeat_every
 import base64
 from io import BytesIO
+from shutil import rmtree
 from fasthtml.common import (
     Style,
     Link,
@@ -45,7 +46,7 @@ from pathlib import Path
 from PIL import Image
 import random
 import logging
-from models import ImageEntry, BackgroundColor, Settings
+from models import ImageEntry, BackgroundColor, Settings, Rotation
 from image_processor import ImageProcessor
 from display import Display
 
@@ -74,7 +75,7 @@ GLOGAL_COUNTER: int = 0
 MODAL_CONTAINER: str = "modal-container"
 
 
-engine = create_engine(f"sqlite:///{DB_FILE}")
+ENGINE = create_engine(f"sqlite:///{DB_FILE}")
 
 IMAGE_PROCESSOR = ImageProcessor()
 
@@ -163,7 +164,7 @@ def render_settings(settings: Settings):
 
 @app.get("/settings")
 def settings():
-    with Session(engine) as session:
+    with Session(ENGINE) as session:
         settings = session.exec(select(Settings)).first()
         if settings:
             return render_settings(settings)
@@ -171,7 +172,7 @@ def settings():
 
 @app.post("/settings")
 def update_settings(cycle: Optional[bool] = None, cycle_time: Optional[int] = None):
-    with Session(engine) as session:
+    with Session(ENGINE) as session:
         settings = session.exec(select(Settings)).first()
         if settings:
             if cycle is not None:
@@ -218,6 +219,32 @@ def render_image_options(entry: ImageEntry):
                     value="white",
                 ),
                 name="background_color",
+            ),
+        ),
+        Label(
+            "Rotation",
+            Select(
+                Option(
+                    "None",
+                    selected=entry.rotation == Rotation._None,
+                    value=0,
+                ),
+                Option(
+                    "90",
+                    selected=entry.rotation == Rotation._90,
+                    value=90,
+                ),
+                Option(
+                    "180",
+                    selected=entry.rotation == Rotation._180,
+                    value=180,
+                ),
+                Option(
+                    "270",
+                    selected=entry.rotation == Rotation._270,
+                    value=270,
+                ),
+                name="rotation",
             ),
         ),
         id=f"options-{entry.id}",
@@ -279,7 +306,7 @@ def render_image(entry: ImageEntry):
 @app.get("/images")
 def render_images():
     articles = []
-    with Session(engine) as session:
+    with Session(ENGINE) as session:
         for entry in session.exec(select(ImageEntry)):
             articles.append(render_image(entry))
 
@@ -397,7 +424,7 @@ def add_image(
             dither=True if dithering else False,
             background_color=background_color,
         )
-        with Session(engine) as session:
+        with Session(ENGINE) as session:
             session.add(new_entry)
             image.save(ORIGINAL_DIR / f"{id}.{IMAGE_EXTENSION}")
             session.commit()
@@ -413,8 +440,9 @@ def update_image(
     grayscale: Optional[bool] = None,
     dithering: Optional[bool] = None,
     background_color: BackgroundColor = BackgroundColor.Black,
+    rotation: str = "None",
 ):
-    with Session(engine) as session:
+    with Session(ENGINE) as session:
         statement = select(ImageEntry).where(ImageEntry.id == id)
         result = session.exec(statement)
         entry = result.one_or_none()
@@ -422,6 +450,7 @@ def update_image(
             entry.grayscale = True if grayscale else False
             entry.dither = True if dithering else False
             entry.background_color = background_color
+            entry.rotation = Rotation.from_str(rotation)
             session.add(entry)
             session.commit()
             return render_image_options(entry)
@@ -429,7 +458,7 @@ def update_image(
 
 @app.delete("/delete/{id}")
 def delete(id: str):
-    with Session(engine) as session:
+    with Session(ENGINE) as session:
         statement = select(ImageEntry).where(ImageEntry.id == id)
         result = session.exec(statement)
         entry_to_delete = result.one_or_none()
@@ -451,7 +480,7 @@ def delete(id: str):
 
 @app.get("/preview/{id}")
 def get_preview(id: str):
-    with Session(engine) as session:
+    with Session(ENGINE) as session:
         entry = session.get(ImageEntry, id)
         if entry is None:
             return message_modal(
@@ -462,9 +491,7 @@ def get_preview(id: str):
             )
 
         image = Image.open(ORIGINAL_DIR / f"{entry.id}.{IMAGE_EXTENSION}")
-        processed_image = IMAGE_PROCESSOR(
-            image, entry.grayscale, entry.dither, entry.background_color
-        )
+        processed_image = IMAGE_PROCESSOR(image, entry)
         buffered = BytesIO()
         processed_image.save(buffered, format="PNG")
         img_str = base64.b64encode(buffered.getvalue())
@@ -478,12 +505,10 @@ def get_preview(id: str):
 
 @app.post("/display/{id}")
 def display_image(id: str):
-    with Session(engine) as session:
+    with Session(ENGINE) as session:
         entry: ImageEntry = session.get(ImageEntry, id)
         image = Image.open(ORIGINAL_DIR / f"{entry.id}.{IMAGE_EXTENSION}")
-        processed_image = IMAGE_PROCESSOR(
-            image, entry.grayscale, entry.dither, entry.background_color
-        )
+        processed_image = IMAGE_PROCESSOR(image, entry)
         logging.info(f"Displaying image: {entry.name}")
         global DISPLAY
         DISPLAY.init()
@@ -495,7 +520,7 @@ def display_image(id: str):
 @app.on_event("startup")
 @repeat_every(seconds=60, wait_first=True)
 def cycle_background_task() -> None:
-    with Session(engine) as session:
+    with Session(ENGINE) as session:
         settings = session.exec(select(Settings)).first()
         if settings.cycle:
             global GLOGAL_COUNTER
@@ -511,10 +536,23 @@ def cycle_background_task() -> None:
 if __name__ == "__main__":
     import uvicorn
 
-    SQLModel.metadata.create_all(engine)
+    try:
+        SQLModel.metadata.create_all(ENGINE)
+        # try to execute a query to see if the database is working
+        with Session(ENGINE) as session:
+            session.exec(select(ImageEntry))
+
+    except Exception as e:
+        print(f"Error creating database: {e}")
+        print("Creating new database")
+        rmtree(DB_DIR, ignore_errors=True)  # remove the directory with
+        rmtree(IMAGE_DIR, ignore_errors=True)
+        print("Created new database")
+        ENGINE = create_engine(f"sqlite:///{DB_FILE}")
+        SQLModel.metadata.create_all(ENGINE)
 
     # ensure that the settings table is populated
-    with Session(engine) as session:
+    with Session(ENGINE) as session:
         if not session.exec(select(Settings)).first():
             session.add(Settings())
             session.commit()
