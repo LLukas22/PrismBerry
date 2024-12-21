@@ -1,3 +1,4 @@
+from typing import Any
 from fastapi_utils.tasks import repeat_every
 from fasthtml.common import (
     Style,
@@ -70,6 +71,8 @@ DB_FILE = DB_DIR / "database.db"
 
 GLOGAL_COUNTER: int = 0
 
+MODAL_CONTAINER: str = "modal-container"
+
 
 engine = create_engine(f"sqlite:///{DB_FILE}")
 
@@ -86,7 +89,7 @@ app, rt = fast_app(live=False, hdrs=(picolink, fontawesome, css), pico=True)
 
 @app.get("/")
 def root():
-    content = Div(id="content")
+    content = Div(id="content", cls="modal-is-opening")
     return (
         Title("PrismBerry"),
         Header(
@@ -119,7 +122,7 @@ def root():
                             "Add",
                             hx_get="/add",
                             hx_trigger="click",
-                            target_id="modal-container",
+                            target_id=MODAL_CONTAINER,
                         )
                     ),
                 ),
@@ -238,7 +241,17 @@ def render_image(entry: ImageEntry):
             ),
             Div(
                 render_image_options(entry),
-                Label(Strong(A("Preview Image", href=f"preview/{entry.id}"))),
+                Label(
+                    Strong(
+                        A(
+                            "Preview Image",
+                            href="#",
+                            hx_get=f"/preview/{entry.id}",
+                            hx_trigger="click",
+                            target_id=MODAL_CONTAINER,
+                        )
+                    )
+                ),
                 Grid(
                     Button(
                         I(cls="fa fa-image"),
@@ -326,7 +339,7 @@ def build_add_dialogue():
                 Input(type="submit", value="Add"),
                 hx_post="/add",
                 hx_trigger="submit",
-                target_id="modal-container",
+                target_id=MODAL_CONTAINER,
             ),
         ),
         open=True,
@@ -335,10 +348,12 @@ def build_add_dialogue():
 
 @app.get("/reset_modal")
 def reset_modal():
-    return Div(id="modal-container")
+    return Div(id=MODAL_CONTAINER)
 
 
-def message_modal(title: str, message: str, content_route: str = "/images") -> Dialog:
+def message_modal(
+    title: str, content: Any, content_route: str = "/images", target: str = "content"
+) -> Dialog:
     return Dialog(
         Article(
             Header(
@@ -347,17 +362,17 @@ def message_modal(title: str, message: str, content_route: str = "/images") -> D
                     rel="prev",
                     hx_get=content_route,
                     hx_trigger="click",
-                    target_id="content",
+                    target_id=target,
                 ),
                 P(Strong(title)),
             ),
-            P(message),
+            content,
             Footer(
                 Button(
                     "Close",
                     hx_get=content_route,
                     hx_trigger="click",
-                    target_id="content",
+                    target_id=target,
                 )
             ),
         ),
@@ -387,10 +402,10 @@ def add_image(
             session.add(new_entry)
             image.save(ORIGINAL_DIR / f"{id}.{IMAGE_EXTENSION}")
             session.commit()
-        return message_modal("Success", "Image added successfully!")
+        return message_modal("Success", P("Image added successfully!"))
 
     except Exception as e:
-        return message_modal("Error", str(e))
+        return message_modal("Error", P(str(e)))
 
 
 @app.patch("/update/{id}")
@@ -449,9 +464,11 @@ def get_preview(id: str):
             image, entry.grayscale, entry.dither, entry.background_color
         )
         processed_image.save(PROCESSED_DIR / f"{entry.id}.{IMAGE_EXTENSION}")
-        return Div(
-            H1(f"Preview of '{entry.name}'"),
+        return message_modal(
+            "Preview",
             Img(src=f"/images/processed/{entry.id}.{IMAGE_EXTENSION}"),
+            content_route="/reset_modal",
+            target=MODAL_CONTAINER,
         )
 
 
