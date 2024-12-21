@@ -1,5 +1,7 @@
 from typing import Any
 from fastapi_utils.tasks import repeat_every
+import base64
+from io import BytesIO
 from fasthtml.common import (
     Style,
     Link,
@@ -63,8 +65,6 @@ IMAGE_DIR = ROOT / "images"
 IMAGE_DIR.mkdir(exist_ok=True)
 ORIGINAL_DIR = IMAGE_DIR / "original"
 ORIGINAL_DIR.mkdir(exist_ok=True)
-PROCESSED_DIR = IMAGE_DIR / "processed"
-PROCESSED_DIR.mkdir(exist_ok=True)
 DB_DIR = ROOT / "db"
 DB_DIR.mkdir(exist_ok=True)
 DB_FILE = DB_DIR / "database.db"
@@ -78,7 +78,6 @@ engine = create_engine(f"sqlite:///{DB_FILE}")
 
 IMAGE_PROCESSOR = ImageProcessor()
 
-# css = Style(":root {--pico-font-size:90%,--pico-font-family: Pacifico, cursive;}")
 css = Style(".fa { margin-right: 6px; } .fa-brands { margin-right: 6px; }")
 fontawesome = Link(
     rel="stylesheet",
@@ -444,8 +443,6 @@ def delete(id: str):
                 # Delete the image
                 if (ORIGINAL_DIR / f"{entry_to_delete.id}.{IMAGE_EXTENSION}").exists():
                     (ORIGINAL_DIR / f"{entry_to_delete.id}.{IMAGE_EXTENSION}").unlink()
-                if (PROCESSED_DIR / f"{entry_to_delete.id}.{IMAGE_EXTENSION}").exists():
-                    (PROCESSED_DIR / f"{entry_to_delete.id}.{IMAGE_EXTENSION}").unlink()
                 return None
 
         except Exception:
@@ -457,16 +454,23 @@ def get_preview(id: str):
     with Session(engine) as session:
         entry = session.get(ImageEntry, id)
         if entry is None:
-            return Div(H1("Not Found"))
+            return message_modal(
+                "Preview",
+                P("Image not found!"),
+                content_route="/reset_modal",
+                target=MODAL_CONTAINER,
+            )
 
         image = Image.open(ORIGINAL_DIR / f"{entry.id}.{IMAGE_EXTENSION}")
         processed_image = IMAGE_PROCESSOR(
             image, entry.grayscale, entry.dither, entry.background_color
         )
-        processed_image.save(PROCESSED_DIR / f"{entry.id}.{IMAGE_EXTENSION}")
+        buffered = BytesIO()
+        processed_image.save(buffered, format="PNG")
+        img_str = base64.b64encode(buffered.getvalue())
         return message_modal(
             "Preview",
-            Img(src=f"/images/processed/{entry.id}.{IMAGE_EXTENSION}"),
+            Img(src=f"data:image/png;base64,{img_str.decode('utf-8')}"),
             content_route="/reset_modal",
             target=MODAL_CONTAINER,
         )
