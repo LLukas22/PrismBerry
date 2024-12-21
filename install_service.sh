@@ -8,12 +8,22 @@ USERNAME="$(whoami)"
 
 chmod +x $SCRIPT_PATH
 
+# Remove the existing service if it exists
+if systemctl list-units --full -all | grep -Fq "$SERVICE_NAME"; then
+    echo "Removing existing service..."
+    sudo systemctl stop $SERVICE_NAME
+    sudo systemctl disable $SERVICE_NAME
+    sudo rm /etc/systemd/system/$SERVICE_NAME
+    sudo systemctl daemon-reload
+    sudo systemctl reset-failed
+fi
+
 # Create the systemd service file
 echo "Creating systemd service file..."
 cat <<EOF > $SERVICE_NAME
 [Unit]
 Description=Run PrismBerry script on startup
-After=network.target
+After=network-online.target
 
 [Service]
 ExecStart=$SCRIPT_PATH

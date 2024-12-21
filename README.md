@@ -22,7 +22,7 @@ cd PrismBerry
 chmod +x install_service.sh
 ./install_service.sh
 ```
-After this the webserver will automatically start and pull updates. 
+This registers the `prismberry.service` service which automatically starts the webserver and pulls updates. 
 The web interface is exposed on `http://<RASPBERRY_PI_IP>:8000`.
 
 ## Parts
