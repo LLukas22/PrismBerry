@@ -30,11 +30,9 @@
 
 import os
 import logging
-import sys
 import time
-import subprocess
 
-from ctypes import *
+from ctypes import CDLL
 
 logger = logging.getLogger(__name__)
 

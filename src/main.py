@@ -1,7 +1,40 @@
-from typing import Annotated
-from fastapi import Depends, FastAPI
 from fastapi_utils.tasks import repeat_every
-from fasthtml.common import *
+from fasthtml.common import (
+    Style,
+    Link,
+    UploadFile,
+    fast_app,
+    Title,
+    Header,
+    Nav,
+    Ul,
+    Li,
+    H1,
+    H2,
+    I,
+    Main,
+    Footer,
+    Small,
+    Div,
+    Article,
+    Grid,
+    Figure,
+    Img,
+    Form,
+    Label,
+    Input,
+    Select,
+    Option,
+    Fieldset,
+    Legend,
+    Strong,
+    A,
+    Button,
+    P,
+    Dialog,
+    FileResponse,
+    picolink,
+)
 from typing import Optional
 from sqlmodel import SQLModel, Session, create_engine, select
 import uuid
@@ -15,10 +48,12 @@ from display import Display
 
 try:
     from display.edp import EPD7IN3F as DisplayToUse
+
     DISPLAY: Display = DisplayToUse()
 except Exception as e:
     print(f"Error loading display: {e}")
     from display import DummyDisplay as DisplayToUse
+
     DISPLAY: Display = DisplayToUse()
 
 IMAGE_EXTENSION = "png"
@@ -34,7 +69,6 @@ DB_DIR.mkdir(exist_ok=True)
 DB_FILE = DB_DIR / "database.db"
 
 GLOGAL_COUNTER: int = 0
-
 
 
 engine = create_engine(f"sqlite:///{DB_FILE}")
@@ -83,7 +117,7 @@ def root():
                         Button(
                             I(cls="fa fa-plus"),
                             "Add",
-                            hx_get=f"/add",
+                            hx_get="/add",
                             hx_trigger="click",
                             target_id="modal-container",
                         )
@@ -399,7 +433,7 @@ def delete(id: str):
                     (PROCESSED_DIR / f"{entry_to_delete.id}.{IMAGE_EXTENSION}").unlink()
                 return None
 
-        except Exception as e:
+        except Exception:
             return render_image(entry_to_delete)
 
 
