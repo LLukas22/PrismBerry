@@ -1,4 +1,4 @@
-from typing import Any
+from typing import Any, Optional
 from fastapi_utils.tasks import repeat_every
 import base64
 from io import BytesIO
@@ -39,7 +39,6 @@ from fasthtml.common import (
     FileResponse,
     picolink,
 )
-from typing import Optional
 from sqlmodel import SQLModel, Session, create_engine, select
 import uuid
 from pathlib import Path
@@ -71,6 +70,7 @@ DB_DIR.mkdir(exist_ok=True)
 DB_FILE = DB_DIR / "database.db"
 
 GLOGAL_COUNTER: int = 0
+LAST_DISPLAYED_IMAGE: Optional[str] = None
 
 MODAL_CONTAINER: str = "modal-container"
 
@@ -528,8 +528,17 @@ def cycle_background_task() -> None:
             if GLOGAL_COUNTER <= 0:
                 GLOGAL_COUNTER = settings.cycle_time
                 entries = session.exec(select(ImageEntry)).all()
-                if len(entries) > 0:
+                if len(entries) == 0:
+                    return
+                elif len(entries) == 1:
+                    entry = entries[0]
+                    display_image(entry.id)
+                else:
+                    global LAST_DISPLAYED_IMAGE
                     entry = random.choice(entries)
+                    while entry.id == LAST_DISPLAYED_IMAGE:
+                        entry = random.choice(entries)
+                    LAST_DISPLAYED_IMAGE = entry.id
                     display_image(entry.id)
 
 
